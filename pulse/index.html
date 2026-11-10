@@ -216,10 +216,11 @@ h1:focus{outline:none}
 .ecg-wrap{position:relative;line-height:0}
 .ecg path.base{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;opacity:.22}
 .ecg path.trace{fill:none;stroke:var(--red);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(229,56,59,.55))}
-/* A periodic track moves exactly one beat per loop; both endpoints look identical. */
-.ecg-track{transform-box:view-box;transform-origin:0 0;animation:ecg-scroll var(--ecg-duration,5.6s) linear infinite;will-change:transform}
-@keyframes ecg-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-1 * var(--ecg-step,280px)))}}
-@media (prefers-reduced-motion:reduce){.ecg-track{animation:none!important;transform:none!important;will-change:auto}}
+/* Only a mask moves; the thin waveform itself never shifts. The mask's dash
+   metrics scale with its path so the highlight also wraps correctly on mobile. */
+.ecg-highlight{fill:none;stroke:#fff;stroke-width:24;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:160 840;stroke-dashoffset:0;animation:ecg-scan 5.5s linear infinite}
+@keyframes ecg-scan{from{stroke-dashoffset:0}to{stroke-dashoffset:-1000}}
+@media (prefers-reduced-motion:reduce){.ecg-highlight{animation:none!important;stroke-dasharray:none;stroke-dashoffset:0}.ecg path.trace{opacity:.55}}
 .ecg-div{padding:0;color:var(--mute-d)}
 .dark .ecg-div,.ecg-div.on-dark{color:#fff}
 .ecg-label{display:flex;justify-content:space-between;font-family:var(--fm);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);padding:0 var(--gut);max-width:var(--wrap);margin:0 auto}
@@ -745,8 +746,9 @@ function ecgPath(w,h,beat){
   }
   return d;
 }
-const ecg=(o={})=>{const w=o.w||1400,h=o.h||72,beat=o.beat||280;const p=ecgPath(w+beat*2,h,beat);
-  return `<svg class="ecg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="--ecg-step:${beat}px;--ecg-duration:${beat/50}s;${o.h?`height:${o.h}px`:''}"><g class="ecg-track"><path class="base" d="${p}" vector-effect="non-scaling-stroke"/><path class="trace" d="${p}" vector-effect="non-scaling-stroke"/></g></svg>`;};
+let ecgMaskId=0;
+const ecg=(o={})=>{const w=o.w||1400,h=o.h||72,beat=o.beat||280;const p=ecgPath(w,h,beat),id=`ecg-light-${++ecgMaskId}`;
+  return `<svg class="ecg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="${o.h?`height:${o.h}px`:''}"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-20" y="-20" width="${w+40}" height="${h+40}"><path class="ecg-highlight" d="${p}" pathLength="1000"/></mask></defs><path class="base" d="${p}" vector-effect="non-scaling-stroke"/><path class="trace" d="${p}" vector-effect="non-scaling-stroke" mask="url(#${id})"/></svg>`;};
 const ecgDivider=(dark,l='',r='')=>`<div class="ecg-div ${dark?'dark':'white'}" aria-hidden="true">${l||r?`<div class="ecg-label"><span>${l}</span><span>${r}</span></div>`:''}<div class="ecg-wrap">${ecg()}</div></div>`;
 
 /* ============ data ============ */
@@ -1246,7 +1248,7 @@ function setupMotion(root){
   if(RM||!('IntersectionObserver' in window)){items.forEach(x=>x.classList.add('in'));return;}
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{rootMargin:'0px 0px -8% 0px'});
   items.forEach(x=>io.observe(x));
-  // ECG tracks loop in CSS without being restarted by viewport intersections.
+  // The fixed ECG's red highlight loops in CSS without viewport-triggered restarts.
 }
 
 
